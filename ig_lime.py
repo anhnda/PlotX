@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 # --------------------------------------------------------------------------- #
 # Config
 # --------------------------------------------------------------------------- #
-IMAGE_PATH = "church.JPEG"
+IMAGE_PATH = "img/church.JPEG"
 
 GRID = 7                  # 7x7 grid -> 49 superpixels
 N_SUPERPIXELS = GRID * GRID
