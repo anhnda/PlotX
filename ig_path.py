@@ -32,7 +32,7 @@ IMAGE_PATH = "church.JPEG"
 STEPS = 128               # interpolation points along the path
 BATCH = 16
 USE_LOGIT = True          # plot raw logit (clearer saturation) vs softmax prob
-TANGENT_ALPHAS = [0.15, 0.45, 0.92]   # where to draw local tangent slopes
+N_TANGENTS = 3            # tangents drawn: 1 steep (in the rise) + rest on the plateau
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 SEED = 0
@@ -128,12 +128,13 @@ def main():
     # integral of the slope = total change (completeness check)
     integral = np.trapz(dfd, alphas)
     total_change = f[-1] - f[0]
-    print(f"f(0)={f[0]:.3f}  f(1)={f[1 - 1 + len(f) - 1]:.3f}  "
-          f"f(1)-f(0)={total_change:.3f}")
+    print(f"f(0)={f[0]:.3f}  f(1)={f[-1]:.3f}  f(1)-f(0)={total_change:.3f}")
     print(f"∫ df/dα dα = {integral:.3f}   (should ≈ f(1)-f(0))")
 
     # --- figure --- #
     fig, ax = plt.subplots(figsize=(9, 5.5))
+
+    yspan = f.max() - f.min()
 
     # the saturating curve f(alpha)
     ax.plot(alphas, f, color="#1f4e8c", lw=2.5, zorder=3, label=r"$f(\alpha)$ = class score")
@@ -141,36 +142,55 @@ def main():
     ax.fill_between(alphas, f[0], f, color="#1f4e8c", alpha=0.12, zorder=1,
                     label="accumulated change\n= ∫ slopes along path")
 
-    # local tangent slopes
-    for a in TANGENT_ALPHAS:
+    # --- pick tangent alphas adaptively ---
+    # one in the steep rise (alpha of max slope), the rest on the plateau.
+    absd = np.abs(dfd)
+    steep_a = float(alphas[int(absd.argmax())])
+    flat_as = list(np.linspace(0.55, 0.92, N_TANGENTS - 1))
+    tangent_alphas = sorted([steep_a] + flat_as)
+    flat_thresh = 0.15 * absd.max()
+
+    # alternate annotation heights so labels never overlap; keep them inside axes
+    for k, a in enumerate(tangent_alphas):
         idx = int(np.argmin(np.abs(alphas - a)))
         slope = dfd[idx]
-        seg = 0.10
+        seg = 0.06
         xs = np.array([a - seg, a + seg])
         ys = f[idx] + slope * (xs - a)
-        flat = abs(slope) < 0.15 * np.max(np.abs(dfd))
-        col = "crimson" if flat else "0.35"
-        ax.plot(xs, ys, color=col, lw=2, zorder=4)
-        ax.scatter([a], [f[idx]], s=28, color=col, zorder=5)
-        tag = "slope ≈ 0\n(saturated)" if flat else f"slope={slope:.1f}"
-        ax.annotate(tag, xy=(a, f[idx]), xytext=(a, f[idx] + 0.10 * (f.max() - f.min()) + 1.0),
-                    fontsize=9, color=col, ha="center")
+        flat = abs(slope) < flat_thresh
+        col = "crimson" if flat else "#0a7d24"
+        ax.plot(xs, ys, color=col, lw=2.5, zorder=4)
+        ax.scatter([a], [f[idx]], s=30, color=col, zorder=5)
+        tag = "slope ≈ 0\n(saturated)" if flat else f"steep slope\n(df/dα={slope:.0f})"
+        # place flat labels below the plateau, steep label below-left in the open area
+        if flat:
+            ytxt = f[idx] - 0.16 * yspan
+            ax.annotate(tag, xy=(a, f[idx]), xytext=(a, ytxt),
+                        fontsize=9, color=col, ha="center", va="top",
+                        arrowprops=dict(arrowstyle="->", color=col, lw=1))
+        else:
+            ax.annotate(tag, xy=(a, f[idx]), xytext=(a + 0.10, f[idx] - 0.28 * yspan),
+                        fontsize=9, color=col, ha="left", va="top",
+                        arrowprops=dict(arrowstyle="->", color=col, lw=1))
 
     ax.scatter([alphas[0]], [f[0]], s=60, color="black", zorder=6)
     ax.scatter([alphas[-1]], [f[-1]], s=60, color="black", zorder=6)
-    ax.text(0.0, f[0], "  baseline (black)", va="center", ha="left", fontsize=9)
-    ax.text(1.0, f[-1], "input  ", va="center", ha="right", fontsize=9)
+    ax.annotate("baseline (black)", xy=(alphas[0], f[0]), xytext=(0.04, f[0] + 0.05 * yspan),
+                fontsize=9, va="bottom", ha="left")
+    ax.annotate("input", xy=(alphas[-1], f[-1]), xytext=(0.95, f[-1] - 0.06 * yspan),
+                fontsize=9, va="top", ha="right")
 
     ax.set_xlabel(r"interpolation $\alpha$   (0 = baseline → 1 = input)")
     ax.set_ylabel("target class score" + ("  (logit)" if USE_LOGIT else "  (prob)"))
-    ax.set_title("Saturation → integrate:  one gradient saturates, "
-                 "the path integral recovers the whole")
+    ax.set_title("Saturation → integrate\none gradient saturates; the path integral recovers the whole",
+                 fontsize=12, pad=10)
     ax.set_xlim(-0.02, 1.05)
+    ax.set_ylim(f.min() - 0.30 * yspan, f.max() + 0.12 * yspan)  # headroom for labels
     ax.grid(alpha=0.25)
     ax.legend(loc="lower right", frameon=False, fontsize=9)
 
-    # inset: slope magnitude collapsing
-    axin = ax.inset_axes([0.10, 0.58, 0.34, 0.34])
+    # inset: slope magnitude collapsing -- placed lower-left, clear of the curve & labels
+    axin = ax.inset_axes([0.40, 0.30, 0.34, 0.32])
     axin.plot(alphas, np.abs(dfd), color="crimson", lw=1.8)
     axin.set_title("slope magnitude |df/dα|", fontsize=8)
     axin.set_xlabel("α", fontsize=8)
