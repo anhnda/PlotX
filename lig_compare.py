@@ -34,7 +34,7 @@ from matplotlib.gridspec import GridSpec
 # --------------------------------------------------------------------------- #
 # Config
 # --------------------------------------------------------------------------- #
-IMAGE_PATH = "img/frenchh.JPEG"
+IMAGE_PATH = "church.JPEG"
 
 STEPS = 64
 LAMBDA = 1.0
@@ -425,30 +425,19 @@ def main():
     ax3.set_ylabel(r"$\mu_k$")
     ax3.grid(alpha=0.22); ax3.legend(fontsize=9, frameon=False, ncol=3, loc="upper center")
 
-    # row 2: FINAL ATTRIBUTIONS (what actually matters)
-    axA = fig.add_subplot(gs[2, 0])
+    # row 2: FINAL ATTRIBUTIONS (what actually matters) -- two maps, centred
+    gs2 = gs[2, :].subgridspec(1, 2, wspace=0.12)
+    axA = fig.add_subplot(gs2[0, 0])
     axA.imshow(image); axA.imshow(smap_s, cmap="inferno", alpha=0.65)
     axA.set_title(f"Straight-line IG attribution\nIns={ins_s:.3f}  Del={del_s:.3f}  "
                   f"Ins$-$Del={ins_s-del_s:.3f}", fontsize=10)
     axA.axis("off")
 
-    axB = fig.add_subplot(gs[2, 1])
+    axB = fig.add_subplot(gs2[0, 1])
     axB.imshow(image); axB.imshow(smap_g, cmap="inferno", alpha=0.65)
     axB.set_title(f"LIG attribution (ours)\nIns={ins_g:.3f}  Del={del_g:.3f}  "
                   f"Ins$-$Del={ins_g-del_g:.3f}", fontsize=10)
     axB.axis("off")
-
-    # bar comparison of the final metrics
-    axC = fig.add_subplot(gs[2, 2])
-    metrics = ["Ins $\\uparrow$", "Del $\\downarrow$", "Ins$-$Del $\\uparrow$"]
-    sv = [ins_s, del_s, ins_s - del_s]
-    gv = [ins_g, del_g, ins_g - del_g]
-    xpos = np.arange(3); w = 0.36
-    axC.bar(xpos - w / 2, sv, w, color=C_STRAIGHT, label="straight IG")
-    axC.bar(xpos + w / 2, gv, w, color=C_LIG, label="LIG")
-    axC.set_xticks(xpos); axC.set_xticklabels(metrics, fontsize=9)
-    axC.set_title("final faithfulness metrics", fontsize=10)
-    axC.grid(alpha=0.22, axis="y"); axC.legend(fontsize=8, frameon=False)
 
     fig.suptitle(r"Straight-line IG  vs  LIG-optimized $(\gamma,\mu)$  "
                  fr"(baseline = {BASELINE};  objective = $\mathrm{{Var}}_\nu(\phi)$, regression guard)",
