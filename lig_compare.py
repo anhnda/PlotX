@@ -34,7 +34,7 @@ from matplotlib.gridspec import GridSpec
 # --------------------------------------------------------------------------- #
 # Config
 # --------------------------------------------------------------------------- #
-IMAGE_PATH = "church.JPEG"
+IMAGE_PATH = "frenchh.JPEG"
 
 STEPS = 64
 LAMBDA = 1.0
